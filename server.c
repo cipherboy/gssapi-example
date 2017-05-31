@@ -106,6 +106,24 @@ int main() {
 		return 4;
 	}
 
+	gss_name_t srv_cred_name;
+	maj_stat = gss_inquire_cred(&min_stat, server_creds, &srv_cred_name, NULL, NULL, NULL);
+	if (GSS_ERROR(maj_stat)) {
+		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 5;
+	}
+
+	gss_buffer_desc srv_exported_name;
+	maj_stat = gss_display_name(&min_stat, srv_cred_name, &srv_exported_name, NULL);
+	if (GSS_ERROR(maj_stat)) {
+		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 5;
+	}
+
+	printf("Server Name (%d): %s\n", srv_exported_name.length, srv_exported_name.value);
+
 	while (1) {
 		client_socket = accept(srv_socket, (struct sockaddr *)NULL, NULL);
 		if (client_socket == -1) {
@@ -139,10 +157,9 @@ int main() {
 		gss_name_t client_name;
 		gss_OID mech_OID;
 
-		int context_established = 0;
-
-		while (!context_established) {
-			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, &mech_OID, &output_token, NULL, NULL, &client_cred);
+		do {
+			receive_token_from_peer(&input_token, client_socket);
+			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, &mech_OID, &output_token, NULL, NULL, NULL);
 			if (GSS_ERROR(maj_stat)) {
 				printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 				print_error(maj_stat, min_stat);
@@ -156,23 +173,12 @@ int main() {
 				}
 				output_token.length = 0;
 			}
-
-			if (maj_stat & GSS_S_CONTINUE_NEEDED) {
-				printf("Have to wait for token...\n");
-				receive_token_from_peer(&input_token, client_socket);
-				printf("Received token (%d) from peer.\n", input_token.length);
-			} else {
-				context_established = 1;
-			}
-		}
+		} while (maj_stat & GSS_S_CONTINUE_NEEDED);
 
 		if (ctx_handle == GSS_C_NO_CONTEXT) {
 			printf("Still no context... but done?\n");
 		}
 
-		if (!context_established) {
-			return 8;
-		}
 		printf("Context established on server!\n");
 
 		gss_name_t src_name;
