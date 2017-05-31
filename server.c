@@ -7,6 +7,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define ERROR_MAJOR 1
+#define ERROR_MINOR 2
+
 int send_token_to_peer(gss_buffer_desc *token, int peer) {
 	ssize_t rw_length;
 
@@ -35,7 +38,7 @@ int receive_token_from_peer(gss_buffer_desc *token, int peer) {
 	return 0;
 }
 
-void print_error(char *s, OM_uint32 m) {
+void print_error(OM_uint32 major, OM_uint32 minor) {
 	OM_uint32 message_context;
 	OM_uint32 status_code;
 	OM_uint32 maj_status;
@@ -43,12 +46,16 @@ void print_error(char *s, OM_uint32 m) {
 	gss_buffer_desc status_string;
 
 	message_context = 0;
-
 	do {
-		maj_status = gss_display_status(&min_status, m, GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		maj_status = gss_display_status(&min_status, major, GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		fprintf(stderr, "Major: %.*s\n", (int)status_string.length, (char *)status_string.value);
+		gss_release_buffer(&min_status, &status_string);
+	} while (message_context != 0);
 
-		fprintf(stderr, "%s, %.*s\n", s, (int)status_string.length, (char *)status_string.value);
-
+	message_context = 0;
+	do {
+		maj_status = gss_display_status(&min_status, minor, GSS_C_MECH_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		fprintf(stderr, "Minor: %.*s\n", (int)status_string.length, (char *)status_string.value);
 		gss_release_buffer(&min_status, &status_string);
 	} while (message_context != 0);
 }
@@ -95,8 +102,7 @@ int main() {
 	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &server_creds, &server_mechs, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error("Major: ", maj_stat);
-		print_error("Minor: ", min_stat);
+		print_error(maj_stat, min_stat);
 		return 4;
 	}
 
@@ -139,8 +145,7 @@ int main() {
 			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, &mech_OID, &output_token, NULL, NULL, &client_cred);
 			if (GSS_ERROR(maj_stat)) {
 				printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-				print_error("Major: ", maj_stat);
-				print_error("Minor: ", min_stat);
+				print_error(maj_stat, min_stat);
 				return 6;
 			}
 
@@ -175,8 +180,7 @@ int main() {
 		maj_stat = gss_inquire_context(&min_stat, ctx_handle, &src_name, &target_name, NULL, NULL, NULL, NULL, NULL);
 		if (GSS_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error("Major: ", maj_stat);
-			print_error("Minor: ", min_stat);
+			print_error(maj_stat, min_stat);
 			return 9;
 		}
 
@@ -184,8 +188,7 @@ int main() {
 		maj_stat = gss_display_name(&min_stat, src_name, &exported_name, NULL);
 		if (GSS_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error("Major: ", maj_stat);
-			print_error("Minor: ", min_stat);
+			print_error(maj_stat, min_stat);
 			return 10;
 		}
 
@@ -194,8 +197,7 @@ int main() {
 		maj_stat = gss_display_name(&min_stat, target_name, &exported_name, NULL);
 		if (GSS_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error("Major: ", maj_stat);
-			print_error("Minor: ", min_stat);
+			print_error(maj_stat, min_stat);
 			return 10;
 		}
 
