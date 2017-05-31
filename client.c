@@ -142,8 +142,20 @@ int main() {
 
 	// receive_token_from_peer(&input_token, client_socket);
 
+	gss_buffer_desc server_canonical_name;
+	gss_name_t server_name;
+	server_canonical_name.value = "TEST/kdc.cipherboy.com@CIPHERBOY.COM";
+	server_canonical_name.length = 36;
+
+	maj_stat = gss_import_name(&min_stat, &server_canonical_name, GSS_C_NO_OID, &server_name);
+	if (GSS_CALLING_ERROR(maj_stat)) {
+		printf("GSS (name)_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 5;
+	}
+
 	while (!context_established) {
-		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, cred_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, &time_rec);
+		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, server_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, &time_rec);
 		if (GSS_CALLING_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 			print_error(maj_stat, min_stat);
