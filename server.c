@@ -91,9 +91,8 @@ int main() {
 	OM_uint32 min_stat;
 	gss_cred_id_t server_creds;
 	gss_OID_set server_mechs;
-	OM_uint32 time_rec;
 
-	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_INITIATE, &server_creds, &server_mechs, &time_rec);
+	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &server_creds, &server_mechs, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 		print_error("Major: ", maj_stat);
@@ -137,7 +136,7 @@ int main() {
 		int context_established = 0;
 
 		while (!context_established) {
-			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, &mech_OID, &output_token, NULL, &time_rec, &client_cred);
+			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, &mech_OID, &output_token, NULL, NULL, &client_cred);
 			if (GSS_ERROR(maj_stat)) {
 				printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 				print_error("Major: ", maj_stat);
