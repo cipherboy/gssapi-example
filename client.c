@@ -36,7 +36,7 @@ int receive_token_from_peer(gss_buffer_desc *token, int peer) {
 	return 0;
 }
 
-void print_error(char *s, OM_uint32 m) {
+void print_error(OM_uint32 major, OM_uint32 minor) {
 	OM_uint32 message_context;
 	OM_uint32 status_code;
 	OM_uint32 maj_status;
@@ -44,12 +44,16 @@ void print_error(char *s, OM_uint32 m) {
 	gss_buffer_desc status_string;
 
 	message_context = 0;
-
 	do {
-		maj_status = gss_display_status(&min_status, m, GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		maj_status = gss_display_status(&min_status, major, GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		fprintf(stderr, "Major: %.*s\n", (int)status_string.length, (char *)status_string.value);
+		gss_release_buffer(&min_status, &status_string);
+	} while (message_context != 0);
 
-		fprintf(stderr, "%s, %.*s\n", s, (int)status_string.length, (char *)status_string.value);
-
+	message_context = 0;
+	do {
+		maj_status = gss_display_status(&min_status, minor, GSS_C_MECH_CODE, GSS_C_NO_OID, &message_context, &status_string);
+		fprintf(stderr, "Minor: %.*s\n", (int)status_string.length, (char *)status_string.value);
 		gss_release_buffer(&min_status, &status_string);
 	} while (message_context != 0);
 }
@@ -70,8 +74,8 @@ int main() {
 
 	srv_addr.sin_family = AF_INET;
 	srv_addr.sin_port = htons(2025);
-	// if (inet_aton("192.168.122.49", &srv_addr.sin_addr) == 0) {
-	if (inet_aton("127.0.0.1", &srv_addr.sin_addr) == 0) {
+	if (inet_aton("192.168.122.49", &srv_addr.sin_addr) == 0) {
+		// if (inet_aton("127.0.0.1", &srv_addr.sin_addr) == 0) {
 		printf("Error: invalid address.\n");
 		return 2;
 	}
@@ -107,8 +111,7 @@ int main() {
 	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_INITIATE, &creds, &mechs, &time_rec);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error("Major: ", maj_stat);
-		print_error("Minor: ", min_stat);
+		print_error(maj_stat, min_stat);
 		return 6;
 	}
 
@@ -116,8 +119,7 @@ int main() {
 	maj_stat = gss_inquire_cred(&min_stat, creds, &cred_name, NULL, NULL, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error("Major: ", maj_stat);
-		print_error("Minor: ", min_stat);
+		print_error(maj_stat, min_stat);
 		return 6;
 	}
 
@@ -125,8 +127,7 @@ int main() {
 	maj_stat = gss_display_name(&min_stat, cred_name, &exported_name, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error("Major: ", maj_stat);
-		print_error("Minor: ", min_stat);
+		print_error(maj_stat, min_stat);
 		return 6;
 	}
 
@@ -145,8 +146,7 @@ int main() {
 		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, cred_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, &time_rec);
 		if (GSS_CALLING_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error("Major: ", maj_stat);
-			print_error("Minor: ", min_stat);
+			print_error(maj_stat, min_stat);
 			return 6;
 		}
 
