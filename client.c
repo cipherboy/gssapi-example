@@ -8,61 +8,34 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "client-sockets.h"
 #include "shared.h"
 
 int
-main() {
-    int enable = 1;
-    int call_val = 0;
-
+main()
+{
     int client_socket;
-    ssize_t rw_length;
-    struct sockaddr_in srv_addr;
     char *data = malloc(sizeof(char) * 1024 * 32);
+    int call_val = 0;
 
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_cred_id_t creds;
+    gss_name_t cred_name;
+    gss_buffer_desc exported_name;
 
-    client_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_socket == -1) {
-        printf("Error: socket connection error.\n");
-        return 1;
-    }
-    setsockopt(client_socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
-
-    srv_addr.sin_family = AF_INET;
-    srv_addr.sin_port = htons(2025);
-    call_val = inet_aton("192.168.122.49", &srv_addr.sin_addr);
-    if (call_val == 0) {
-        // if (inet_aton("127.0.0.1", &srv_addr.sin_addr) == 0) {
-        printf("Error: invalid address.\n");
-        return 2;
+    client_socket = setup_client();
+    if (client_socket < 0) {
+        fprintf(stderr, "Error setting up client. Exiting!\n");
+        goto cleanup;
     }
 
-    call_val = connect(client_socket, (struct sockaddr *)&srv_addr,
-                      sizeof(srv_addr));
-    if (call_val == -1) {
-        printf("Error: binding to socket (%d:%s).\n", errno, strerror(errno));
-        return 3;
+    call_val = client_handshake(client_socket);
+    if (call_val != 0) {
+        fprintf(stderr, "Error performing handshake. Exiting!\n");
+        goto cleanup;
     }
 
-    rw_length = write(client_socket, "auth\0", 5);
-    if (rw_length < 0) {
-        printf("Error: writing to socket (%d:%s).\n", errno, strerror(errno));
-        return 4;
-    }
-
-    printf("Sent auth...\n");
-
-    rw_length = read(client_socket, data, 1024 * 32);
-    if (strncmp(data, "ack", 3) != 0) {
-        printf("Error: reading from socket (%d:%s).\n",
-               errno, strerror(errno));
-        return 5;
-    }
-
-    printf("Received ack...\n");
     printf("Beginning GSSAPI transmissions.\n");
 
     maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
@@ -73,7 +46,6 @@ main() {
         return 6;
     }
 
-    gss_name_t cred_name;
     maj_stat = gss_inquire_cred(&min_stat, creds, &cred_name,
                                 NULL, NULL, NULL);
     if (GSS_ERROR(maj_stat)) {
@@ -82,7 +54,6 @@ main() {
         return 6;
     }
 
-    gss_buffer_desc exported_name;
     maj_stat = gss_display_name(&min_stat, cred_name, &exported_name, NULL);
     if (GSS_ERROR(maj_stat)) {
         printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
@@ -91,13 +62,6 @@ main() {
     }
 
     printf("Name (%d): %s\n", exported_name.length, exported_name.value);
-
-    maj_stat = gss_release_buffer(&min_stat, &exported_name);
-    if (GSS_ERROR(maj_stat)) {
-        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-        print_error(maj_stat, min_stat);
-        return 17;
-    }
 
     int context_established = 0;
     gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
@@ -179,6 +143,7 @@ cleanup:
         }
     }
 
+    maj_stat = gss_release_buffer(&min_stat, &exported_name);
     maj_stat = gss_release_buffer(&min_stat, &output_token);
     maj_stat = gss_release_name(&min_stat, &cred_name);
     maj_stat = gss_release_name(&min_stat, &server_name);

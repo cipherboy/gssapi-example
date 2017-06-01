@@ -11,7 +11,8 @@
 #include "shared.h"
 
 int
-main() {
+main()
+{
     int enable = 1;
     int srv_socket;
     int client_socket;
@@ -24,6 +25,7 @@ main() {
         printf("Error: socket connection error.\n");
         return 1;
     }
+
     setsockopt(srv_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
     setsockopt(client_socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
 
