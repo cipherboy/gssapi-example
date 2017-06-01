@@ -13,6 +13,46 @@
 #include "server-kerberos.h"
 
 int
+be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+
+    int exit_out = 0;
+
+    gss_buffer_desc input_msg = GSS_C_EMPTY_BUFFER;
+    gss_buffer_desc output_msg = GSS_C_EMPTY_BUFFER;
+
+    while (1) {
+        maj_stat = gss_release_buffer(&min_stat, &input_msg);
+        maj_stat = gss_release_buffer(&min_stat, &output_msg);
+
+        receive_token_from_peer(&input_msg, client_socket);
+
+        if (input_msg.length == 0) {
+            goto cleanup;
+        }
+
+        maj_stat = gss_unwrap(&min_stat, ctx_handle, &input_msg, &output_msg,
+                              NULL, NULL);
+
+        if (GSS_ERROR(maj_stat)) {
+            print_error(maj_stat, min_stat);
+            exit_out = 1;
+            goto cleanup;
+        }
+
+        printf("r: %.*s\n", (int)output_msg.length, (char *)output_msg.value);
+    }
+
+cleanup:
+    maj_stat = gss_release_buffer(&min_stat, &input_msg);
+    maj_stat = gss_release_buffer(&min_stat, &output_msg);
+
+    return exit_out;
+}
+
+int
 main()
 {
     int srv_socket;
@@ -69,6 +109,10 @@ main()
             goto cleanup;
         }
 
+        printf("Beginning life as an echo server...\n");
+        be_echo_server(ctx_handle, client_socket);
+
+        printf("Cleaning up!\n");
         do_cleanup_context(&ctx_handle, client_socket);
 
         close(client_socket);
