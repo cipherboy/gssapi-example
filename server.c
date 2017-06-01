@@ -32,7 +32,10 @@ be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
 
         maj_stat = gss_unwrap(&min_stat, ctx_handle, &input_msg, &output_msg,
                               NULL, NULL);
-        maj_stat = gss_release_buffer(&min_stat, &input_msg);
+
+        if (input_msg.length > 0) {
+            free(input_msg.value);
+        }
 
         if (GSS_ERROR(maj_stat)) {
             print_error(maj_stat, min_stat);
@@ -45,7 +48,10 @@ be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
     }
 
 cleanup:
-    maj_stat = gss_release_buffer(&min_stat, &input_msg);
+    if (input_msg.length > 0) {
+        free(input_msg.value);
+    }
+
     maj_stat = gss_release_buffer(&min_stat, &output_msg);
 
     return exit_out;

@@ -37,7 +37,7 @@ be_echo_client(int client_socket, gss_ctx_id_t ctx_handle)
 
         message = NULL;
 
-        message = readline ("> ");
+        message = readline("> ");
         if (message == NULL) {
             fprintf(stderr, "Error: return message from readline was NULL.\n");
             exit_out = 1;
@@ -50,8 +50,8 @@ be_echo_client(int client_socket, gss_ctx_id_t ctx_handle)
         }
 
         input_msg.length = strlen(message) + 1;
-        input_msg.value = malloc(sizeof(char * ) * input_msg.length);
-        strcpy(input_msg.value, message);
+        input_msg.value = malloc(sizeof(char *) * input_msg.length);
+        memcpy(input_msg.value, message, input_msg.length);
 
         maj_stat = gss_wrap(&min_stat, ctx_handle, 2025, GSS_C_QOP_DEFAULT,
                             &input_msg, &conf_state, &output_msg);
