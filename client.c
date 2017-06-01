@@ -20,7 +20,7 @@ main()
 
     OM_uint32 min_stat;
 
-    gss_cred_id_t creds;
+    gss_cred_id_t creds = GSS_C_NO_CREDENTIAL;
     gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 
     client_socket = setup_client();

@@ -20,7 +20,7 @@ main()
     int call_val = 0;
 
     OM_uint32 min_stat;
-    gss_cred_id_t server_creds;
+    gss_cred_id_t server_creds = GSS_C_NO_CREDENTIAL;
     gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 
     srv_socket = setup_server();
