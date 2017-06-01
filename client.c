@@ -38,7 +38,7 @@ main()
     printf("Beginning GSSAPI transmissions.\n");
 
     /* Start by acquiring credentials from ccache */
-    call_val = do_acquire_creds(&creds);
+    call_val = do_acquire_creds(&creds, GSS_C_INITIATE);
     if (call_val != 0) {
         fprintf(stderr, "Error getting creds. Exiting!\n");
         goto cleanup;

@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "shared.h"
+
 int
 send_token_to_peer(gss_buffer_desc *token, int peer)
 {
@@ -47,6 +49,61 @@ receive_token_from_peer(gss_buffer_desc *token, int peer)
 
     return 0;
 }
+
+int
+do_acquire_creds(gss_cred_id_t *creds, gss_cred_usage_t usage) {
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                usage, creds, NULL, NULL);
+
+    if (GSS_ERROR(maj_stat)) {
+        print_error(maj_stat, min_stat);
+        return 1;
+    }
+
+    return 0;
+}
+
+int
+do_print_cred_name(gss_cred_id_t creds) {
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_name_t cred_name = GSS_C_NO_NAME;
+    gss_buffer_desc exported_name = GSS_C_EMPTY_BUFFER;
+    int exit_out = 0;
+
+    maj_stat = gss_inquire_cred(&min_stat, creds, &cred_name,
+                                NULL, NULL, NULL);
+    if (GSS_ERROR(maj_stat)) {
+        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+        print_error(maj_stat, min_stat);
+        exit_out = 1;
+        goto cleanup;
+    }
+
+    maj_stat = gss_display_name(&min_stat, cred_name, &exported_name, NULL);
+    if (GSS_ERROR(maj_stat)) {
+        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+        print_error(maj_stat, min_stat);
+        exit_out = 2;
+        goto cleanup;
+    }
+
+    printf("Name (%zu): %s\n",
+           exported_name.length, (char *)exported_name.value);
+
+cleanup:
+    maj_stat = gss_release_buffer(&min_stat, &exported_name);
+
+    if (cred_name != GSS_C_NO_NAME) {
+        maj_stat = gss_release_name(&min_stat, &cred_name);
+    }
+
+    return exit_out;
+}
+
 
 void
 print_error_int(char *prefix, int status_type, OM_uint32 status_value)
