@@ -1,249 +1,198 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <gssapi.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ERROR_MAJOR 1
-#define ERROR_MINOR 2
+#include "shared.h"
 
-int send_token_to_peer(gss_buffer_desc *token, int peer) {
-	ssize_t rw_length;
+int
+main() {
+    int enable = 1;
+    int srv_socket;
+    int client_socket;
+    ssize_t rw_length;
+    struct sockaddr_in srv_addr;
+    char *data = malloc(sizeof(char) * 1024 * 32);
 
-	rw_length = write(peer, token->value, token->length);
-	if (rw_length < 0) {
-		printf("Error: writing to socket (%d:%s).\n", errno, strerror(errno));
-		return 1;
-	}
+    srv_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (srv_socket == -1) {
+        printf("Error: socket connection error.\n");
+        return 1;
+    }
+    setsockopt(srv_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
+    setsockopt(client_socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
 
-	return 0;
-}
+    srv_addr.sin_family = AF_INET;
+    srv_addr.sin_port = htons(2025);
+    srv_addr.sin_addr.s_addr = htons(INADDR_ANY);
 
-int receive_token_from_peer(gss_buffer_desc *token, int peer) {
-	ssize_t rw_length;
+    if (bind(srv_socket, (struct sockaddr *)&srv_addr, sizeof(srv_addr)) == -1) {
+        printf("Error: binding to socket (%d:%s).\n", errno, strerror(errno));
+        return 3;
+    }
 
-	token->length = 0;
-	token->value = malloc(sizeof(void) * 1024 * 32);
-	rw_length = read(peer, token->value, 1024 * 32);
-	if (rw_length < 0) {
-		printf("Error: reading from socket (%d:%s).\n", errno, strerror(errno));
-		return 1;
-	}
-	printf("Read: %d\n", rw_length);
-	token->length = rw_length;
+    if (listen(srv_socket, 10) == -1) {
+        printf("Error: listening to socket (%d:%s).\n", errno, strerror(errno));
+        return 4;
+    }
 
-	return 0;
-}
+    printf("Successfully listening on 2025...\n");
 
-void print_error(OM_uint32 major, OM_uint32 minor) {
-	OM_uint32 message_context;
-	OM_uint32 status_code;
-	OM_uint32 maj_status;
-	OM_uint32 min_status;
-	gss_buffer_desc status_string;
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_cred_id_t server_creds;
 
-	message_context = 0;
-	do {
-		maj_status = gss_display_status(&min_status, major, GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context, &status_string);
-		fprintf(stderr, "Major: %.*s\n", (int)status_string.length, (char *)status_string.value);
-		gss_release_buffer(&min_status, &status_string);
-	} while (message_context != 0);
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &server_creds, NULL, NULL);
+    if (GSS_ERROR(maj_stat)) {
+        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+        print_error(maj_stat, min_stat);
+        return 4;
+    }
 
-	message_context = 0;
-	do {
-		maj_status = gss_display_status(&min_status, minor, GSS_C_MECH_CODE, GSS_C_NO_OID, &message_context, &status_string);
-		fprintf(stderr, "Minor: %.*s\n", (int)status_string.length, (char *)status_string.value);
-		gss_release_buffer(&min_status, &status_string);
-	} while (message_context != 0);
-}
+    gss_name_t srv_cred_name;
+    maj_stat = gss_inquire_cred(&min_stat, server_creds, &srv_cred_name, NULL, NULL, NULL);
+    if (GSS_ERROR(maj_stat)) {
+        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+        print_error(maj_stat, min_stat);
+        return 5;
+    }
 
-int main() {
-	int enable = 1;
-	int srv_socket;
-	int client_socket;
-	ssize_t rw_length;
-	struct sockaddr_in srv_addr;
-	char *data = malloc(sizeof(char) * 1024 * 32);
+    gss_buffer_desc srv_exported_name;
+    maj_stat = gss_display_name(&min_stat, srv_cred_name, &srv_exported_name, NULL);
+    if (GSS_ERROR(maj_stat)) {
+        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+        print_error(maj_stat, min_stat);
+        return 5;
+    }
 
-	srv_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (srv_socket == -1) {
-		printf("Error: socket connection error.\n");
-		return 1;
-	}
-	if (setsockopt(srv_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-		printf("Error: setting socket options failed.\n");
-		return 2;
-	}
+    printf("Server Name (%d): %s\n", srv_exported_name.length, srv_exported_name.value);
 
-	srv_addr.sin_family = AF_INET;
-	srv_addr.sin_port = htons(2025);
-	srv_addr.sin_addr.s_addr = htons(INADDR_ANY);
+    while (1) {
+        client_socket = accept(srv_socket, (struct sockaddr *)NULL, NULL);
+        if (client_socket == -1) {
+            printf("Error: accepting socket error (%d:%s).", errno, strerror(errno));
+            return 5;
+        }
+        printf("Successfully accepted client:\n");
 
-	if (bind(srv_socket, (struct sockaddr *)&srv_addr, sizeof(srv_addr)) == -1) {
-		printf("Error: binding to socket (%d:%s).\n", errno, strerror(errno));
-		return 3;
-	}
+        rw_length = read(client_socket, data, 1024 * 32);
+        if (strncmp(data, "auth", 4) != 0) {
+            printf("Didn't send auth...\n");
+            continue;
+        }
 
-	if (listen(srv_socket, 10) == -1) {
-		printf("Error: listening to socket (%d:%s).\n", errno, strerror(errno));
-		return 4;
-	}
+        printf("Got auth.\n");
 
-	printf("Successfully listening on 2025...\n");
+        rw_length = write(client_socket, "ack\n", 4);
+        if (rw_length != 4) {
+            printf("Error: Unable to write all data to socket.\n");
+            break;
+        }
 
-	OM_uint32 maj_stat;
-	OM_uint32 min_stat;
-	gss_cred_id_t server_creds;
+        printf("Wrote ack.\n");
+        printf("Beginning GSSAPI transmissions.\n");
 
-	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &server_creds, NULL, NULL);
-	if (GSS_ERROR(maj_stat)) {
-		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error(maj_stat, min_stat);
-		return 4;
-	}
+        gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 
-	gss_name_t srv_cred_name;
-	maj_stat = gss_inquire_cred(&min_stat, server_creds, &srv_cred_name, NULL, NULL, NULL);
-	if (GSS_ERROR(maj_stat)) {
-		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error(maj_stat, min_stat);
-		return 5;
-	}
+        gss_buffer_desc input_token = GSS_C_EMPTY_BUFFER;
+        gss_buffer_desc output_token = GSS_C_EMPTY_BUFFER;
+        gss_name_t client_name;
+        do {
+            receive_token_from_peer(&input_token, client_socket);
+            maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, NULL, &output_token, NULL, NULL, NULL);
+            if (GSS_ERROR(maj_stat)) {
+                printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+                print_error(maj_stat, min_stat);
+                return 6;
+            }
 
-	gss_buffer_desc srv_exported_name;
-	maj_stat = gss_display_name(&min_stat, srv_cred_name, &srv_exported_name, NULL);
-	if (GSS_ERROR(maj_stat)) {
-		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-		print_error(maj_stat, min_stat);
-		return 5;
-	}
+            if (output_token.length != 0) {
+                printf("Have to send token (%d) to peer.\n", output_token.length);
+                if (send_token_to_peer(&output_token, client_socket) != 0) {
+                    return 7;
+                }
+                maj_stat = gss_release_buffer(&min_stat, &output_token);
+                output_token.length = 0;
+            }
+        } while (maj_stat & GSS_S_CONTINUE_NEEDED);
 
-	printf("Server Name (%d): %s\n", srv_exported_name.length, srv_exported_name.value);
+        if (ctx_handle == GSS_C_NO_CONTEXT) {
+            printf("Still no context... but done?\n");
+        }
 
-	while (1) {
-		client_socket = accept(srv_socket, (struct sockaddr *)NULL, NULL);
-		if (client_socket == -1) {
-			printf("Error: accepting socket error (%d:%s).", errno, strerror(errno));
-			return 5;
-		}
-		printf("Successfully accepted client:\n");
+        maj_stat = gss_release_buffer(&min_stat, &input_token);
+        printf("Context established on server!\n");
 
-		rw_length = read(client_socket, data, 1024 * 32);
-		if (strncmp(data, "auth", 4) != 0) {
-			printf("Didn't send auth...\n");
-			continue;
-		}
+        gss_name_t src_name;
+        gss_name_t target_name;
+        maj_stat = gss_inquire_context(&min_stat, ctx_handle, &src_name, &target_name, NULL, NULL, NULL, NULL, NULL);
+        if (GSS_ERROR(maj_stat)) {
+            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+            print_error(maj_stat, min_stat);
+            return 9;
+        }
 
-		printf("Got auth.\n");
+        gss_buffer_desc exported_name;
+        maj_stat = gss_display_name(&min_stat, src_name, &exported_name, NULL);
+        if (GSS_ERROR(maj_stat)) {
+            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+            print_error(maj_stat, min_stat);
+            return 10;
+        }
 
-		rw_length = write(client_socket, "ack\n", 4);
-		if (rw_length != 4) {
-			printf("Error: Unable to write all data to socket.\n");
-			break;
-		}
+        printf("Source Name (%d): %s\n", exported_name.length, exported_name.value);
 
-		printf("Wrote ack.\n");
-		printf("Beginning GSSAPI transmissions.\n");
+        maj_stat = gss_release_buffer(&min_stat, &exported_name);
 
-		gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
+        maj_stat = gss_display_name(&min_stat, target_name, &exported_name, NULL);
+        if (GSS_ERROR(maj_stat)) {
+            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+            print_error(maj_stat, min_stat);
+            return 10;
+        }
 
-		gss_buffer_desc input_token = GSS_C_EMPTY_BUFFER;
-		gss_buffer_desc output_token = GSS_C_EMPTY_BUFFER;
-		gss_name_t client_name;
-		do {
-			receive_token_from_peer(&input_token, client_socket);
-			maj_stat = gss_accept_sec_context(&min_stat, &ctx_handle, server_creds, &input_token, GSS_C_NO_CHANNEL_BINDINGS, &client_name, NULL, &output_token, NULL, NULL, NULL);
-			if (GSS_ERROR(maj_stat)) {
-				printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-				print_error(maj_stat, min_stat);
-				return 6;
-			}
+        printf("Target Name (%d): %s\n", exported_name.length, exported_name.value);
 
-			if (output_token.length != 0) {
-				printf("Have to send token (%d) to peer.\n", output_token.length);
-				if (send_token_to_peer(&output_token, client_socket) != 0) {
-					return 7;
-				}
-				maj_stat = gss_release_buffer(&min_stat, &output_token);
-				output_token.length = 0;
-			}
-		} while (maj_stat & GSS_S_CONTINUE_NEEDED);
+        maj_stat = gss_release_buffer(&min_stat, &exported_name);
 
-		if (ctx_handle == GSS_C_NO_CONTEXT) {
-			printf("Still no context... but done?\n");
-		}
+        maj_stat = gss_release_name(&min_stat, &target_name);
+        maj_stat = gss_release_name(&min_stat, &src_name);
+        maj_stat = gss_release_name(&min_stat, &client_name);
 
-		maj_stat = gss_release_buffer(&min_stat, &input_token);
-		printf("Context established on server!\n");
+        maj_stat = gss_delete_sec_context(&min_stat, &ctx_handle, &output_token);
+        if (GSS_ERROR(maj_stat)) {
+            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+            print_error(maj_stat, min_stat);
+            return 15;
+        }
 
-		gss_name_t src_name;
-		gss_name_t target_name;
-		maj_stat = gss_inquire_context(&min_stat, ctx_handle, &src_name, &target_name, NULL, NULL, NULL, NULL, NULL);
-		if (GSS_ERROR(maj_stat)) {
-			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error(maj_stat, min_stat);
-			return 9;
-		}
+        if (output_token.length != 0) {
+            printf("Have to send token (%d) to peer.\n", output_token.length);
+            if (send_token_to_peer(&output_token, client_socket) != 0) {
+                return 16;
+            }
+        }
 
-		gss_buffer_desc exported_name;
-		maj_stat = gss_display_name(&min_stat, src_name, &exported_name, NULL);
-		if (GSS_ERROR(maj_stat)) {
-			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error(maj_stat, min_stat);
-			return 10;
-		}
+        maj_stat = gss_release_buffer(&min_stat, &output_token);
+        if (GSS_ERROR(maj_stat)) {
+            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+            print_error(maj_stat, min_stat);
+            return 17;
+        }
 
-		printf("Source Name (%d): %s\n", exported_name.length, exported_name.value);
+        break;
+    }
 
-		maj_stat = gss_release_buffer(&min_stat, &exported_name);
+    maj_stat = gss_release_name(&min_stat, &srv_cred_name);
+    maj_stat = gss_release_buffer(&min_stat, &srv_exported_name);
+    maj_stat = gss_release_cred(&min_stat, &server_creds);
+    free(data);
+    close(srv_socket);
 
-		maj_stat = gss_display_name(&min_stat, target_name, &exported_name, NULL);
-		if (GSS_ERROR(maj_stat)) {
-			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error(maj_stat, min_stat);
-			return 10;
-		}
-
-		printf("Target Name (%d): %s\n", exported_name.length, exported_name.value);
-
-		maj_stat = gss_release_buffer(&min_stat, &exported_name);
-
-		maj_stat = gss_release_name(&min_stat, &target_name);
-		maj_stat = gss_release_name(&min_stat, &src_name);
-		maj_stat = gss_release_name(&min_stat, &client_name);
-
-		maj_stat = gss_delete_sec_context(&min_stat, &ctx_handle, &output_token);
-		if (GSS_ERROR(maj_stat)) {
-			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error(maj_stat, min_stat);
-			return 15;
-		}
-
-		if (output_token.length != 0) {
-			printf("Have to send token (%d) to peer.\n", output_token.length);
-			if (send_token_to_peer(&output_token, client_socket) != 0) {
-				return 16;
-			}
-		}
-
-		maj_stat = gss_release_buffer(&min_stat, &output_token);
-		if (GSS_ERROR(maj_stat)) {
-			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-			print_error(maj_stat, min_stat);
-			return 17;
-		}
-
-		break;
-	}
-
-	maj_stat = gss_release_name(&min_stat, &srv_cred_name);
-	maj_stat = gss_release_buffer(&min_stat, &srv_exported_name);
-	maj_stat = gss_release_cred(&min_stat, &server_creds);
-	free(data);
-	close(srv_socket);
-
-	return 0;
+    return 0;
 }
