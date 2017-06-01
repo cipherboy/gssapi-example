@@ -20,7 +20,7 @@ do_acquire_creds(gss_cred_id_t *creds) {
 
     if (GSS_ERROR(maj_stat)) {
         print_error(maj_stat, min_stat);
-        return 1
+        return 1;
     }
 
     return 0;
@@ -30,8 +30,8 @@ int
 do_print_cred_name(gss_cred_id_t creds) {
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
-    gss_name_t cred_name;
-    gss_buffer_desc exported_name;
+    gss_name_t cred_name = GSS_C_NO_NAME;
+    gss_buffer_desc exported_name = GSS_C_EMPTY_BUFFER;
     int exit_out = 0;
 
     maj_stat = gss_inquire_cred(&min_stat, creds, &cred_name,
@@ -56,7 +56,10 @@ do_print_cred_name(gss_cred_id_t creds) {
 
 cleanup:
     maj_stat = gss_release_buffer(&min_stat, &exported_name);
-    maj_stat = gss_release_name(&min_stat, &cred_name);
+
+    if (cred_name != GSS_C_NO_NAME) {
+        maj_stat = gss_release_name(&min_stat, &cred_name);
+    }
 
     return exit_out;
 }
