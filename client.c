@@ -105,10 +105,8 @@ int main() {
 	OM_uint32 maj_stat;
 	OM_uint32 min_stat;
 	gss_cred_id_t creds;
-	gss_OID_set mechs;
-	OM_uint32 time_rec;
 
-	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_INITIATE, &creds, &mechs, &time_rec);
+	maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_INITIATE, &creds, NULL, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 		print_error(maj_stat, min_stat);
@@ -147,8 +145,6 @@ int main() {
 
 	OM_uint32 flags_rec;
 
-	// receive_token_from_peer(&input_token, client_socket);
-
 	gss_buffer_desc server_canonical_name;
 	gss_name_t server_name;
 	server_canonical_name.value = "TEST/kdc.cipherboy.com@CIPHERBOY.COM";
@@ -162,7 +158,7 @@ int main() {
 	}
 
 	while (!context_established) {
-		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, server_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, &time_rec);
+		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, server_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, NULL);
 		if (GSS_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 			print_error(maj_stat, min_stat);
@@ -222,8 +218,6 @@ int main() {
 	maj_stat = gss_release_name(&min_stat, &server_name);
 
 	maj_stat = gss_release_cred(&min_stat, &creds);
-
-	maj_stat = gss_release_oid_set(&min_stat, &mechs);
 
 	free(data);
 	close(client_socket);
