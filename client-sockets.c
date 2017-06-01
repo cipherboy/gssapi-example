@@ -26,8 +26,8 @@ setup_client()
         return -1;
     }
 
-    setsockopt(client_socket_out, IPPROTO_TCP,
-               TCP_NODELAY, &enable, sizeof(int));
+    setsockopt(client_socket_out, IPPROTO_TCP, TCP_NODELAY, &enable,
+               sizeof(int));
 
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_port = htons(2025);
@@ -53,6 +53,7 @@ client_handshake(int client_socket)
 {
     char *data = NULL;
     ssize_t rw_length = 0;
+    int call_val = 0;
     int exit_out = 0;
 
     rw_length = write(client_socket, "auth\0", 5);
@@ -65,6 +66,11 @@ client_handshake(int client_socket)
     printf("Sent auth...\n");
 
     data = malloc(sizeof(char) * 1024 * 32);
+    if (data == NULL) {
+        fprintf(stderr, "Error: Malloc failed!\n");
+        exit_out = 99;
+        goto cleanup;
+    }
 
     rw_length = read(client_socket, data, 1024 * 32);
     if (rw_length < 0 || rw_length < 3) {
@@ -73,7 +79,8 @@ client_handshake(int client_socket)
         goto cleanup;
     }
 
-    if (strncmp(data, "ack", 3) != 0) {
+    call_val = strncmp(data, "ack", 3);
+    if (call_val != 0) {
         printf("Error: reading from socket (%d:%s).\n",
                errno, strerror(errno));
        exit_out = 3;
@@ -83,9 +90,8 @@ client_handshake(int client_socket)
     printf("Received ack...\n");
 
 cleanup:
-    if (data != NULL) {
-        free(data);
-    }
+    free(data);
+
 
     return exit_out;
 }

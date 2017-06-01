@@ -14,19 +14,16 @@ int
 do_acquire_creds(gss_cred_id_t *creds) {
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
-    int exit_out = 0;
 
     maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
                                 GSS_C_INITIATE, creds, NULL, NULL);
 
     if (GSS_ERROR(maj_stat)) {
         print_error(maj_stat, min_stat);
-        exit_out = 1;
-        goto cleanup;
+        return 1
     }
 
-cleanup:
-    return exit_out;
+    return 0;
 }
 
 int
@@ -86,9 +83,7 @@ do_get_server_name(gss_name_t *server_name)
 }
 
 int
-do_establish_context(
-                     gss_ctx_id_t *ctx_handle,
-                     gss_cred_id_t creds,
+do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,
                      int client_socket)
 {
     int context_established = 0;
