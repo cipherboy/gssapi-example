@@ -1,4 +1,3 @@
-#include <arpa/inet.h>
 #include <errno.h>
 #include <gssapi.h>
 #include <netinet/tcp.h>
@@ -7,6 +6,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "client-sockets.h"
 
@@ -15,7 +17,7 @@ setup_client()
 {
     int enable = 1;
     int call_val = 0;
-    int client_socket_out;
+    int client_socket_out = 0;
     struct sockaddr_in srv_addr;
 
     client_socket_out = socket(AF_INET, SOCK_STREAM, 0);
@@ -30,7 +32,7 @@ setup_client()
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_port = htons(2025);
 
-    call_val = inet_aton("192.168.122.49", &srv_addr.sin_addr);
+    call_val = inet_pton(AF_INET, "192.168.122.49", &srv_addr.sin_addr);
     if (call_val == 0) {
         printf("Error: invalid address.\n");
         return -2;
@@ -49,10 +51,11 @@ setup_client()
 int
 client_handshake(int client_socket)
 {
-    char *data = malloc(sizeof(char) * 1024 * 32);
+    char *data = NULL;
+    ssize_t rw_length = 0;
     int exit_out = 0;
 
-    int rw_length = write(client_socket, "auth\0", 5);
+    rw_length = write(client_socket, "auth\0", 5);
     if (rw_length < 0) {
         printf("Error: writing to socket (%d:%s).\n", errno, strerror(errno));
         exit_out = 1;
@@ -60,6 +63,8 @@ client_handshake(int client_socket)
     }
 
     printf("Sent auth...\n");
+
+    data = malloc(sizeof(char) * 1024 * 32);
 
     rw_length = read(client_socket, data, 1024 * 32);
     if (rw_length < 0 || rw_length < 3) {
@@ -78,6 +83,9 @@ client_handshake(int client_socket)
     printf("Received ack...\n");
 
 cleanup:
-    free(data);
+    if (data != NULL) {
+        free(data);
+    }
+
     return exit_out;
 }
