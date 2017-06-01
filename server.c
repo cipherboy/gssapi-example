@@ -9,70 +9,38 @@
 #include <unistd.h>
 
 #include "shared.h"
+#include "server-sockets.h"
 
 int
 main()
 {
-    int enable = 1;
     int srv_socket;
     int client_socket;
-    ssize_t rw_length;
-    struct sockaddr_in srv_addr;
-    char *data = malloc(sizeof(char) * 1024 * 32);
-
-    srv_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (srv_socket == -1) {
-        printf("Error: socket connection error.\n");
-        return 1;
-    }
-
-    setsockopt(srv_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
-    setsockopt(client_socket, IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
-
-    srv_addr.sin_family = AF_INET;
-    srv_addr.sin_port = htons(2025);
-    srv_addr.sin_addr.s_addr = htons(INADDR_ANY);
-
-    if (bind(srv_socket, (struct sockaddr *)&srv_addr, sizeof(srv_addr)) == -1) {
-        printf("Error: binding to socket (%d:%s).\n", errno, strerror(errno));
-        return 3;
-    }
-
-    if (listen(srv_socket, 10) == -1) {
-        printf("Error: listening to socket (%d:%s).\n", errno, strerror(errno));
-        return 4;
-    }
-
-    printf("Successfully listening on 2025...\n");
+    int call_val = 0;
 
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_cred_id_t server_creds;
 
-    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET, GSS_C_ACCEPT, &server_creds, NULL, NULL);
-    if (GSS_ERROR(maj_stat)) {
-        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-        print_error(maj_stat, min_stat);
-        return 4;
+    char *data = malloc(sizeof(char) * 1024 * 32);
+
+    srv_socket = setup_server();
+    if (srv_socket < 0) {
+        fprintf(stderr, "Error setting up server. Exiting!\n");
+        goto cleanup;
     }
 
-    gss_name_t srv_cred_name;
-    maj_stat = gss_inquire_cred(&min_stat, server_creds, &srv_cred_name, NULL, NULL, NULL);
-    if (GSS_ERROR(maj_stat)) {
-        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-        print_error(maj_stat, min_stat);
-        return 5;
+    call_val = do_acquire_creds(&server_creds, GSS_C_ACCEPT);
+    if (call_val != 0) {
+        fprintf(stderr, "Error acquiring server creds. Exiting!\n");
+        goto cleanup;
     }
 
-    gss_buffer_desc srv_exported_name;
-    maj_stat = gss_display_name(&min_stat, srv_cred_name, &srv_exported_name, NULL);
-    if (GSS_ERROR(maj_stat)) {
-        printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-        print_error(maj_stat, min_stat);
-        return 5;
+    call_val = do_print_cred_name(server_creds);
+    if (call_val != 0) {
+        fprintf(stderr, "Error printing server cred name. Exiting!\n");
+        goto cleanup;
     }
-
-    printf("Server Name (%d): %s\n", srv_exported_name.length, srv_exported_name.value);
 
     while (1) {
         client_socket = accept(srv_socket, (struct sockaddr *)NULL, NULL);
@@ -81,6 +49,11 @@ main()
             return 5;
         }
         printf("Successfully accepted client:\n");
+
+        call_val = server_client_handshake(client_socket);
+        if (call_val != 0) {
+            goto cleanup;
+        }
 
         rw_length = read(client_socket, data, 1024 * 32);
         if (strncmp(data, "auth", 4) != 0) {
