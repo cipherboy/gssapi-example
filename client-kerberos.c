@@ -96,29 +96,3 @@ cleanup:
 
     return exit_out;
 }
-
-void
-do_cleanup_context(gss_ctx_id_t *ctx_handle, int client_socket)
-{
-    OM_uint32 maj_stat;
-    OM_uint32 min_stat;
-
-    gss_buffer_desc output_token = GSS_C_EMPTY_BUFFER;
-
-    if (*ctx_handle != GSS_C_NO_CONTEXT) {
-        maj_stat = gss_delete_sec_context(&min_stat, ctx_handle,
-                                          &output_token);
-
-        if (GSS_ERROR(maj_stat)) {
-            printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
-            print_error(maj_stat, min_stat);
-            return;
-        }
-
-        if (output_token.length != 0) {
-            if (send_token_to_peer(&output_token, client_socket) != 0) {
-                return;
-            }
-        }
-    }
-}

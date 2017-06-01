@@ -9,6 +9,8 @@ int do_acquire_creds(gss_cred_id_t *creds, gss_cred_usage_t usage);
 
 int do_print_cred_name(gss_cred_id_t creds);
 
+void do_cleanup_context(gss_ctx_id_t *ctx_handle, int client_socket);
+
 void print_error(OM_uint32 major, OM_uint32 minor);
 
 #endif

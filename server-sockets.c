@@ -63,7 +63,7 @@ server_client_handshake(int client_socket)
     int call_val = 0;
     int exit_out = 0;
 
-    data = malloc(sizeof(char *) * 1024 * 32)
+    data = malloc(sizeof(char *) * 1024 * 32);
     if (data == NULL) {
         fprintf(stderr, "Error: Malloc failed!\n");
 
@@ -80,8 +80,8 @@ server_client_handshake(int client_socket)
     }
 
 
-    call_value = strncmp(data, "auth", 4);
-    if (call_value != 0) {
+    call_val = strncmp(data, "auth", 4);
+    if (call_val != 0) {
         printf("Client didn't get auth. Ignoring...\n");
 
         exit_out = 2;
