@@ -133,6 +133,13 @@ int main() {
 
 	printf("Name (%d): %s\n", exported_name.length, exported_name.value);
 
+	maj_stat = gss_release_buffer(&min_stat, &exported_name);
+	if (GSS_ERROR(maj_stat)) {
+		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 17;
+	}
+
 	int context_established = 0;
 	gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 	gss_buffer_desc input_token = GSS_C_EMPTY_BUFFER;
@@ -156,7 +163,7 @@ int main() {
 
 	while (!context_established) {
 		maj_stat = gss_init_sec_context(&min_stat, creds, &ctx_handle, server_name, GSS_C_NO_OID, 0, 0, GSS_C_NO_CHANNEL_BINDINGS, &input_token, NULL, &output_token, &flags_rec, &time_rec);
-		if (GSS_CALLING_ERROR(maj_stat)) {
+		if (GSS_ERROR(maj_stat)) {
 			printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
 			print_error(maj_stat, min_stat);
 			return 6;
@@ -166,6 +173,13 @@ int main() {
 			printf("Have to send token (%d) to peer.\n", output_token.length);
 			if (send_token_to_peer(&output_token, client_socket) != 0) {
 				return 7;
+			}
+
+			maj_stat = gss_release_buffer(&min_stat, &output_token);
+			if (GSS_ERROR(maj_stat)) {
+				printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+				print_error(maj_stat, min_stat);
+				return 17;
 			}
 		}
 
@@ -182,5 +196,35 @@ int main() {
 	}
 	printf("Context established on client!\n");
 
+	maj_stat = gss_delete_sec_context(&min_stat, &ctx_handle, &output_token);
+	if (GSS_ERROR(maj_stat)) {
+		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 15;
+	}
+
+	if (output_token.length != 0) {
+		printf("Have to send token (%d) to peer.\n", output_token.length);
+		if (send_token_to_peer(&output_token, client_socket) != 0) {
+			return 16;
+		}
+	}
+
+	maj_stat = gss_release_buffer(&min_stat, &output_token);
+	if (GSS_ERROR(maj_stat)) {
+		printf("GSS_ERROR: %u:%u\n", maj_stat, min_stat);
+		print_error(maj_stat, min_stat);
+		return 17;
+	}
+
+	maj_stat = gss_release_name(&min_stat, &cred_name);
+
+	maj_stat = gss_release_name(&min_stat, &server_name);
+
+	maj_stat = gss_release_cred(&min_stat, &creds);
+
+	maj_stat = gss_release_oid_set(&min_stat, &mechs);
+
+	free(data);
 	close(client_socket);
 }
