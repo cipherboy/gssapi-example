@@ -24,9 +24,6 @@ be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
     gss_buffer_desc output_msg = GSS_C_EMPTY_BUFFER;
 
     while (1) {
-        maj_stat = gss_release_buffer(&min_stat, &input_msg);
-        maj_stat = gss_release_buffer(&min_stat, &output_msg);
-
         receive_token_from_peer(&input_msg, client_socket);
 
         if (input_msg.length == 0) {
@@ -35,6 +32,7 @@ be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
 
         maj_stat = gss_unwrap(&min_stat, ctx_handle, &input_msg, &output_msg,
                               NULL, NULL);
+        maj_stat = gss_release_buffer(&min_stat, &input_msg);
 
         if (GSS_ERROR(maj_stat)) {
             print_error(maj_stat, min_stat);
@@ -43,6 +41,7 @@ be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)
         }
 
         printf("r: %.*s\n", (int)output_msg.length, (char *)output_msg.value);
+        maj_stat = gss_release_buffer(&min_stat, &output_msg);
     }
 
 cleanup:

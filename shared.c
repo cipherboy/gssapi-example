@@ -41,7 +41,12 @@ receive_token_from_peer(gss_buffer_desc *token, int peer)
         printf("Error: reading from socket (%d:%s).\n",
                errno, strerror(errno));
 
+        free(token->value);
+        token->value = NULL;
         return 1;
+    } else if (rw_length == 0) {
+        free(token->value);
+        token->value = NULL;
     }
 
     printf("Read %ld bytes.\n", rw_length);
