@@ -14,6 +14,8 @@ int
 send_token_to_peer(gss_buffer_desc *token, int peer)
 {
     ssize_t rw_length = 0;
+    size_t pos = 0;
+
     rw_length = write(peer, token->value, token->length);
 
     if (rw_length < 0) {
@@ -23,7 +25,16 @@ send_token_to_peer(gss_buffer_desc *token, int peer)
         return 1;
     }
 
-    printf("Sent %ld bytes.\n", rw_length);
+    printf("Sent %ld bytes:", rw_length);
+
+    // Begin pretty printing of sent data
+    for (pos = 0; pos < token->length; pos++) {
+        if ((pos % 36) == 0) {
+            printf("\n\t");
+        }
+        printf("%02x", ((uint8_t *) token->value)[pos]);
+    }
+    printf("\n\n");
 
     return 0;
 }
