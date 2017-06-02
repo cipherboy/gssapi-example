@@ -96,3 +96,49 @@ cleanup:
 
     return exit_out;
 }
+
+
+/* https://github.com/krb5/krb5/blob/master/src/tests/gssapi/common.c */
+void
+display_oid(const char *tag, gss_OID oid)
+{
+    OM_uint32 major, minor;
+    gss_buffer_desc buf;
+
+    major = gss_oid_to_str(&minor, oid, &buf);
+    if (GSS_ERROR(major)) {
+        print_error(major, minor);
+        return;
+    }
+
+    if (tag != NULL)
+        printf("%s:\t", tag);
+    printf("%.*s\n", (int)buf.length, (char *)buf.value);
+    (void)gss_release_buffer(&minor, &buf);
+}
+
+int
+do_print_mechs()
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_OID_set mech_set;
+    size_t pos = 0;
+    gss_OID mech;
+
+    maj_stat = gss_indicate_mechs(&min_stat, &mech_set);
+    if (GSS_ERROR(maj_stat)) {
+        print_error(maj_stat, min_stat);
+        return 1;
+    }
+
+    printf("Printing Available Mechanisms (%zu):\n", mech_set->count);
+    for (pos = 0; pos < mech_set->count; pos++) {
+        mech = mech_set->elements + pos;
+        display_oid("", mech);
+    }
+    printf("\n");
+
+    gss_release_oid_set(&min_stat, &mech_set);
+    return 0;
+}

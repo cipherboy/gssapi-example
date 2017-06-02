@@ -1,0 +1,30 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+__CLIENT_KERBEROS_H__	client-kerberos.h	2;"	d
+__CLIENT_SOCKETS_H__	client-sockets.h	2;"	d
+__SERVER_KERBEROS_H__	server-kerberos.h	2;"	d
+__SERVER_SOCKETS_H__	server-sockets.h	2;"	d
+__SHARED_H__	shared.h	2;"	d
+be_echo_client	client.c	/^be_echo_client(int client_socket, gss_ctx_id_t ctx_handle)$/;"	f
+be_echo_server	server.c	/^be_echo_server(gss_ctx_id_t ctx_handle, int client_socket)$/;"	f
+client_handshake	client-sockets.c	/^client_handshake(int client_socket)$/;"	f
+do_acquire_creds	shared.c	/^do_acquire_creds(gss_cred_id_t *creds, gss_cred_usage_t usage) {$/;"	f
+do_cleanup_context	shared.c	/^do_cleanup_context(gss_ctx_id_t *ctx_handle, int client_socket)$/;"	f
+do_establish_context	client-kerberos.c	/^do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,$/;"	f
+do_establish_server_context	server-kerberos.c	/^do_establish_server_context(gss_ctx_id_t *ctx_handle,$/;"	f
+do_get_server_name	client-kerberos.c	/^do_get_server_name(gss_name_t *server_name)$/;"	f
+do_print_context_names	server-kerberos.c	/^do_print_context_names(gss_ctx_id_t ctx_handle)$/;"	f
+do_print_cred_name	shared.c	/^do_print_cred_name(gss_cred_id_t creds) {$/;"	f
+main	client.c	/^main()$/;"	f
+main	server.c	/^main()$/;"	f
+print_error	shared.c	/^void print_error(OM_uint32 major, OM_uint32 minor)$/;"	f
+print_error_int	shared.c	/^print_error_int(char *prefix, int status_type, OM_uint32 status_value)$/;"	f
+receive_token_from_peer	shared.c	/^receive_token_from_peer(gss_buffer_desc *token, int peer)$/;"	f
+send_token_to_peer	shared.c	/^send_token_to_peer(gss_buffer_desc *token, int peer)$/;"	f
+server_client_handshake	server-sockets.c	/^server_client_handshake(int client_socket)$/;"	f
+setup_client	client-sockets.c	/^setup_client()$/;"	f
+setup_server	server-sockets.c	/^setup_server()$/;"	f

@@ -118,6 +118,12 @@ main()
         goto cleanup;
     }
 
+    call_val = do_print_mechs();
+    if (call_val != 0) {
+        fprintf(stderr, "Error getting mechanisms. Exiting!\n");
+        goto cleanup;
+    }
+
     /* Establish context between client and server */
     call_val = do_establish_context(&ctx_handle, creds, client_socket);
     if (call_val != 0) {
