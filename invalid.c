@@ -9,72 +9,119 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "client-sockets.h"
+#include "client-kerberos.h"
 #include "shared.h"
 
+/* https://github.com/cipherboy/krb5/blob/master/src/lib/gssapi/spnego/gssapiP_spnego.h#L91 */
+/* Structure for context handle */
+typedef struct {
+	OM_uint32	magic_num;
+	gss_buffer_desc DER_mechTypes;
+	gss_OID_set mech_set;
+	gss_OID internal_mech;  /* alias into mech_set->elements */
+	gss_ctx_id_t ctx_handle;
+	int mic_reqd;
+	int mic_sent;
+	int mic_rcvd;
+	int firstpass;
+	int mech_complete;
+	int nego_done;
+	int initiate;
+	int opened;
+	OM_uint32 ctx_flags;
+	gss_name_t internal_name;
+	gss_OID actual_mech;
+} spnego_gss_ctx_id_rec, *spnego_gss_ctx_id_t;
+
 int
-setup_krb5_context(gss_ctx_id_t *context_handle)
+setup_spnego_context(gss_ctx_id_t *context_handle)
 {
-    krb5_gss_ctx_id_rec *ctx;
-    ctx = malloc(sizeof(krb5_gss_ctx_id_rec));
+    spnego_gss_ctx_id_rec *ctx;
+
+    ctx = malloc(sizeof(spnego_gss_ctx_id_rec));
     if (ctx == NULL) {
         return 1;
     }
 
-    /* Fill in context: https://github.com/cipherboy/krb5/blob/master/src/lib/gssapi/krb5/init_sec_context.c#L539 */
-    memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
-    ctx->magic = KG_CONTEXT;
+    memset(ctx, 0, sizeof(spnego_gss_ctx_id_rec));
 
-    ctx->auth_context = (krb5_auth_context)calloc(1, sizeof(struct _krb5_auth_context));
-    if (ctx->auth_context == NULL) {
-        return 2;
-    }
+    ctx->magic_num = 0x00000fed;
+	ctx->ctx_handle = GSS_C_NO_CONTEXT;
+	ctx->mech_set = NULL;
+	ctx->internal_mech = NULL;
+	ctx->DER_mechTypes.length = 0;
+	ctx->DER_mechTypes.value = NULL;
+	ctx->mic_reqd = 0;
+	ctx->mic_sent = 0;
+	ctx->mic_rcvd = 0;
+	ctx->mech_complete = 0;
+	ctx->nego_done = 0;
+	ctx->opened = 0;
+	ctx->initiate = GSS_C_INITIATE;
+	ctx->internal_name = GSS_C_NO_NAME;
+	ctx->actual_mech = GSS_C_NO_OID;
 
-    /* krb5_auth_con_init: https://github.com/cipherboy/krb5/blob/master/src/lib/krb5/krb/auth_con.c#L32 */
-    (*ctx->auth_context)->auth_context_flags =
-        KRB5_AUTH_CONTEXT_DO_TIME |  KRB5_AUTH_CONN_INITIALIZED;
-
-    (*ctx->auth_context)->checksum_func = NULL;
-    (*ctx->auth_context)->checksum_func_data = NULL;
-    (*ctx->auth_context)->negotiated_etype = ENCTYPE_NULL;
-    (*ctx->auth_context)->magic = KV5M_AUTH_CONTEXT;
-
-    /* https://github.com/cipherboy/krb5/blob/master/src/lib/gssapi/krb5/init_sec_context.c#L556 */
-    ctx->initiate = 1;
-    ctx->seed_init = 0;
-    ctx->seqstate = 0;
-
-    ctx->gss_flags = (GSS_C_CONF_FLAG | GSS_C_INTEG_FLAG |
-                                  GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
-                                  GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG |
-                                  GSS_C_DCE_STYLE | GSS_C_IDENTIFY_FLAG |
-                                  GSS_C_EXTENDED_ERROR_FLAG | GSS_C_TRANS_FLAG);
-
-    ctx->krb_times.endtime = 0;
-
-    // Magic nulls? :)
-    ctx->here = NULL;
-    ctx->there = NULL;
-    ctx->subkey = NULL;
-    ctx->auth_context = NULL;
-
-    ctx->enc = NULL;
-    ctx->seq = NULL;
-    ctx->have_acceptor_subkey = 0;
-
-    // Return it!
     *context_handle = (gss_ctx_id_t) ctx;
     return 0;
 }
 
-
 int
 main()
 {
+    gss_cred_id_t creds = GSS_C_NO_CREDENTIAL;
     gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
     int call_val;
+    int client_socket;
+    OM_uint32 min_stat;
 
-    call_val = setup_krb5_context(&ctx_handle);
+    call_val = setup_spnego_context(&ctx_handle);
     if (call_val != 0) {
         return 1;
     }
+
+
+    client_socket = setup_client();
+    if (client_socket < 0) {
+        fprintf(stderr, "Error setting up client. Exiting!\n");
+        goto cleanup;
+    }
+
+    call_val = client_handshake(client_socket);
+    if (call_val != 0) {
+        fprintf(stderr, "Error performing handshake. Exiting!\n");
+        goto cleanup;
+    }
+
+
+    printf("Beginning GSSAPI transmissions.\n");
+
+    /* Start by acquiring credentials from ccache */
+    call_val = do_acquire_creds(&creds, GSS_C_INITIATE);
+    if (call_val != 0) {
+        fprintf(stderr, "Error getting creds. Exiting!\n");
+        goto cleanup;
+    }
+
+    /* Display name of client user */
+    call_val = do_print_cred_name(creds);
+    if (call_val != 0) {
+        fprintf(stderr, "Error getting creds. Exiting!\n");
+        goto cleanup;
+    }
+
+    /* Establish context between client and server */
+    call_val = do_establish_context(&ctx_handle, creds, client_socket);
+    if (call_val != 0) {
+        fprintf(stderr, "Error getting context. Exiting!\n");
+        goto cleanup;
+    }
+
+
+cleanup:
+
+    do_cleanup_context(&ctx_handle, client_socket);
+    gss_release_cred(&min_stat, &creds);
+
+    close(client_socket);
 }
