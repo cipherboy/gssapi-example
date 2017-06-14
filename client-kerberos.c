@@ -50,7 +50,7 @@ do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,
 
     gss_channel_bindings_t cb = GSS_C_NO_CHANNEL_BINDINGS;
 
-    char *ip = "192.168.122.49";
+    char *ip = "192.168.122.48";
     char *app_data = "magic";
 
     call_value = do_get_server_name(&server_name);

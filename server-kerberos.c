@@ -25,12 +25,13 @@ do_establish_server_context(gss_ctx_id_t *ctx_handle,
 
     gss_channel_bindings_t cb = GSS_C_NO_CHANNEL_BINDINGS;
 
-    char *ip = "192.168.122.49";
+    char *ip = "192.168.122.48";
     char *app_data = "magic";
 
     cb = calloc(sizeof(struct gss_channel_bindings_struct), 1);
     cb->initiator_addrtype = GSS_C_AF_NULLADDR;
     cb->initiator_address.length = 0;
+    cb->acceptor_addrtype = GSS_C_AF_INET;
     cb->acceptor_address.length = strlen(ip);
     cb->acceptor_address.value = ip;
     cb->application_data.length = strlen(app_data);
