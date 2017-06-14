@@ -48,10 +48,25 @@ do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,
 
     gss_name_t server_name = GSS_C_NO_NAME;
 
+    gss_channel_bindings_t cb = GSS_C_NO_CHANNEL_BINDINGS;
+
+    char *ip = "192.168.122.49";
+    char *app_data = "magic";
+
     call_value = do_get_server_name(&server_name);
     if (call_value != 0) {
         return 1;
     }
+
+    cb = calloc(sizeof(struct gss_channel_bindings_struct), 1);
+
+    cb->initiator_addrtype = GSS_C_AF_NULLADDR;
+    cb->initiator_address.length = 0;
+    cb->acceptor_addrtype= GSS_C_AF_INET;
+    cb->acceptor_address.length = strlen(ip);
+    cb->acceptor_address.value = ip;
+    cb->application_data.length = strlen(app_data);
+    cb->application_data.value = app_data;
 
     /* Per https://tools.ietf.org/html/rfc2744.html#section-5.19 */
     while (!context_established) {
@@ -61,7 +76,7 @@ do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,
                                         server_name,
                                         GSS_C_NO_OID,
                                         0, 0,
-                                        GSS_C_NO_CHANNEL_BINDINGS,
+                                        cb,
                                         &input_token, NULL,
                                         &output_token, NULL, NULL);
 

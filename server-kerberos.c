@@ -23,12 +23,25 @@ do_establish_server_context(gss_ctx_id_t *ctx_handle,
 
     int exit_out = 0;
 
+    gss_channel_bindings_t cb = GSS_C_NO_CHANNEL_BINDINGS;
+
+    char *ip = "192.168.122.49";
+    char *app_data = "magic";
+
+    cb = calloc(sizeof(struct gss_channel_bindings_struct), 1);
+    cb->initiator_addrtype = GSS_C_AF_NULLADDR;
+    cb->initiator_address.length = 0;
+    cb->acceptor_address.length = strlen(ip);
+    cb->acceptor_address.value = ip;
+    cb->application_data.length = strlen(app_data);
+    cb->application_data.value = app_data;
+
     do {
         receive_token_from_peer(&input_token, client_socket);
 
         maj_stat = gss_accept_sec_context(&min_stat, ctx_handle, server_creds,
                                           &input_token,
-                                          GSS_C_NO_CHANNEL_BINDINGS,
+                                          cb,
                                           NULL, NULL, &output_token, NULL,
                                           NULL, NULL);
 
