@@ -75,7 +75,7 @@ do_establish_context(gss_ctx_id_t *ctx_handle, gss_cred_id_t creds,
                                         ctx_handle,
                                         server_name,
                                         GSS_C_NO_OID,
-                                        0, 0,
+                                        GSS_C_MUTUAL_FLAG, 0,
                                         cb,
                                         &input_token, NULL,
                                         &output_token, NULL, NULL);
