@@ -1,12 +1,14 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <gssapi.h>
+#include <gssapi/gssapi_ext.h>
 #include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "shared.h"
 #include "server-kerberos.h"
@@ -15,8 +17,9 @@ int
 do_establish_server_context(gss_ctx_id_t *ctx_handle,
                             gss_cred_id_t server_creds, int client_socket)
 {
-    OM_uint32 maj_stat;
-    OM_uint32 min_stat;
+    OM_uint32 maj_stat = 0;
+    OM_uint32 min_stat = 0;
+    OM_uint32 ret_flags = 0;
 
     gss_buffer_desc input_token = GSS_C_EMPTY_BUFFER;
     gss_buffer_desc output_token = GSS_C_EMPTY_BUFFER;
@@ -25,7 +28,7 @@ do_establish_server_context(gss_ctx_id_t *ctx_handle,
 
     gss_channel_bindings_t cb = GSS_C_NO_CHANNEL_BINDINGS;
 
-    char *ip = "192.168.122.48";
+    char *ip = "192.168.122.49";
     char *app_data = "magic";
 
     cb = calloc(sizeof(struct gss_channel_bindings_struct), 1);
@@ -37,19 +40,27 @@ do_establish_server_context(gss_ctx_id_t *ctx_handle,
     cb->application_data.length = strlen(app_data);
     cb->application_data.value = app_data;
 
+    maj_stat = gss_create_sec_context(&min_stat, ctx_handle);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    maj_stat = gss_set_context_flags(&min_stat, *ctx_handle, 0, 0xFFFFFFFF);
+    assert(maj_stat == GSS_S_COMPLETE);
+
     do {
         receive_token_from_peer(&input_token, client_socket);
 
         maj_stat = gss_accept_sec_context(&min_stat, ctx_handle, server_creds,
                                           &input_token,
                                           cb,
-                                          NULL, NULL, &output_token, NULL,
+                                          NULL, NULL, &output_token, &ret_flags,
                                           NULL, NULL);
 
         if (GSS_ERROR(maj_stat)) {
             print_error(maj_stat, min_stat);
-            exit_out = 1;
-            goto cleanup;
+            if ((maj_stat & GSS_S_BAD_BINDINGS) == 0) {
+                exit_out = 1;
+                goto cleanup;
+            }
         }
 
         if (output_token.length != 0) {
@@ -66,6 +77,8 @@ do_establish_server_context(gss_ctx_id_t *ctx_handle,
     if (*ctx_handle == GSS_C_NO_CONTEXT) {
         printf("Still no context... but done?\n");
     }
+
+    printf("ret_flags: %u, %u\n", ret_flags, ret_flags & 2048);
 
 cleanup:
     maj_stat = gss_release_buffer(&min_stat, &input_token);

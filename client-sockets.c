@@ -32,7 +32,7 @@ setup_client()
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_port = htons(2025);
 
-    call_val = inet_pton(AF_INET, "192.168.122.48", &srv_addr.sin_addr);
+    call_val = inet_pton(AF_INET, "192.168.122.49", &srv_addr.sin_addr);
     if (call_val == 0) {
         printf("Error: invalid address.\n");
         return -2;
